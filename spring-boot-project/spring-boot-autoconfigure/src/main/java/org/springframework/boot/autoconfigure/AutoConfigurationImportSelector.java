@@ -61,6 +61,8 @@ import org.springframework.util.StringUtils;
  * {@link DeferredImportSelector} to handle {@link EnableAutoConfiguration
  * auto-configuration}. This class can also be subclassed if a custom variant of
  * {@link EnableAutoConfiguration @EnableAutoConfiguration} is needed.
+ * 
+ * 处理 @EnableAutoConfiguration 注解的资源导入 @Import
  *
  * @author Phillip Webb
  * @author Andy Wilkinson
@@ -115,14 +117,22 @@ public class AutoConfigurationImportSelector
 		if (!isEnabled(annotationMetadata)) {
 			return EMPTY_ENTRY;
 		}
+		//获得注解的属性
 		AnnotationAttributes attributes = getAttributes(annotationMetadata);
+		//获得符合条件的配置类的数组
 		List<String> configurations = getCandidateConfigurations(annotationMetadata,
 				attributes);
+		//移除重复的配置类
 		configurations = removeDuplicates(configurations);
+		//获取需要排除的配置类
 		Set<String> exclusions = getExclusions(annotationMetadata, attributes);
+		//检查排除的配置类是否合法
 		checkExcludedClasses(configurations, exclusions);
+		//从configurations移除排除配置类
 		configurations.removeAll(exclusions);
+		//根据条件（Condition），过滤掉不符合条件的配置类
 		configurations = filter(configurations, autoConfigurationMetadata);
+		//触发自动配置类引入完成的事件
 		fireAutoConfigurationImportEvents(configurations, exclusions);
 		return new AutoConfigurationEntry(configurations, exclusions);
 	}
@@ -132,7 +142,13 @@ public class AutoConfigurationImportSelector
 		return AutoConfigurationGroup.class;
 	}
 
+	/**
+	 * 判断是否开启自动配置
+	 * @param metadata
+	 * @return
+	 */
 	protected boolean isEnabled(AnnotationMetadata metadata) {
+		//查看配置文件spring.boot.enableautoconfiguration的配置情况
 		if (getClass() == AutoConfigurationImportSelector.class) {
 			return getEnvironment().getProperty(
 					EnableAutoConfiguration.ENABLED_OVERRIDE_PROPERTY, Boolean.class,
@@ -149,7 +165,9 @@ public class AutoConfigurationImportSelector
 	 * @return annotation attributes
 	 */
 	protected AnnotationAttributes getAttributes(AnnotationMetadata metadata) {
+		//此处返回的是@EnableAutoConfiguration 
 		String name = getAnnotationClass().getName();
+		//注解属性,必定为exclude excludeName 
 		AnnotationAttributes attributes = AnnotationAttributes
 				.fromMap(metadata.getAnnotationAttributes(name, true));
 		Assert.notNull(attributes,
@@ -171,6 +189,8 @@ public class AutoConfigurationImportSelector
 	 * Return the auto-configuration class names that should be considered. By default
 	 * this method will load candidates using {@link SpringFactoriesLoader} with
 	 * {@link #getSpringFactoriesLoaderFactoryClass()}.
+	 * 
+	 * 获得符合条件的配置类的数组。
 	 * @param metadata the source metadata
 	 * @param attributes the {@link #getAttributes(AnnotationMetadata) annotation
 	 * attributes}
@@ -178,6 +198,7 @@ public class AutoConfigurationImportSelector
 	 */
 	protected List<String> getCandidateConfigurations(AnnotationMetadata metadata,
 			AnnotationAttributes attributes) {
+		//获得META-INF/spring.factories 加载的指定类型为 EnableAutoConfiguration 类。
 		List<String> configurations = SpringFactoriesLoader.loadFactoryNames(
 				getSpringFactoriesLoaderFactoryClass(), getBeanClassLoader());
 		Assert.notEmpty(configurations,
@@ -197,14 +218,15 @@ public class AutoConfigurationImportSelector
 
 	private void checkExcludedClasses(List<String> configurations,
 			Set<String> exclusions) {
+		// 获得 exclusions 不在 invalidExcludes 的集合，添加到 invalidExcludes 中
 		List<String> invalidExcludes = new ArrayList<>(exclusions.size());
 		for (String exclusion : exclusions) {
-			if (ClassUtils.isPresent(exclusion, getClass().getClassLoader())
-					&& !configurations.contains(exclusion)) {
+			if (ClassUtils.isPresent(exclusion, getClass().getClassLoader()) // classpath 存在该类
+					&& !configurations.contains(exclusion)) {// configurations 不存在该类
 				invalidExcludes.add(exclusion);
 			}
 		}
-		if (!invalidExcludes.isEmpty()) {
+		if (!invalidExcludes.isEmpty()) {//处理无效的配置(即非AutoConfiguration的类请不要指定在exclude中)
 			handleInvalidExcludes(invalidExcludes);
 		}
 	}
@@ -234,8 +256,11 @@ public class AutoConfigurationImportSelector
 	protected Set<String> getExclusions(AnnotationMetadata metadata,
 			AnnotationAttributes attributes) {
 		Set<String> excluded = new LinkedHashSet<>();
+		//注解上的exclude
 		excluded.addAll(asList(attributes, "exclude"));
+		//注解上的excludeName
 		excluded.addAll(Arrays.asList(attributes.getStringArray("excludeName")));
+		//配置文件的 spring.autoconfigure.exclude 属性
 		excluded.addAll(getExcludeAutoConfigurationsProperty());
 		return excluded;
 	}
@@ -255,29 +280,33 @@ public class AutoConfigurationImportSelector
 			AutoConfigurationMetadata autoConfigurationMetadata) {
 		long startTime = System.nanoTime();
 		String[] candidates = StringUtils.toStringArray(configurations);
-		boolean[] skip = new boolean[candidates.length];
-		boolean skipped = false;
+		boolean[] skip = new boolean[candidates.length];// 每个配置类是否需要忽略的数组，通过下标与candidates互相索引
+		boolean skipped = false;//是否有忽略的配置
+		//得到所有的AutoConfigurationImportFilter
 		for (AutoConfigurationImportFilter filter : getAutoConfigurationImportFilters()) {
+			//设置filter的属性
 			invokeAwareMethods(filter);
+			//执行批量匹配
 			boolean[] match = filter.match(candidates, autoConfigurationMetadata);
 			for (int i = 0; i < match.length; i++) {
-				if (!match[i]) {
+				if (!match[i]) {//如果有不匹配的
 					skip[i] = true;
-					candidates[i] = null;
-					skipped = true;
+					candidates[i] = null;//标记为空,下次的循环就无须继续匹配当前candidate
+					skipped = true;//标记存在不匹配的
 				}
 			}
 		}
 		if (!skipped) {
 			return configurations;
 		}
+		//存在忽略的类则进行排除
 		List<String> result = new ArrayList<>(candidates.length);
 		for (int i = 0; i < candidates.length; i++) {
 			if (!skip[i]) {
 				result.add(candidates[i]);
 			}
 		}
-		if (logger.isTraceEnabled()) {
+		if (logger.isTraceEnabled()) {//日志
 			int numberFiltered = configurations.size() - result.size();
 			logger.trace("Filtered " + numberFiltered + " auto configuration class in "
 					+ TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)
@@ -302,11 +331,15 @@ public class AutoConfigurationImportSelector
 
 	private void fireAutoConfigurationImportEvents(List<String> configurations,
 			Set<String> exclusions) {
+		 // <1> 加载指定类型 AutoConfigurationImportListener 对应的，在 `META-INF/spring.factories` 里的类名的数组。
 		List<AutoConfigurationImportListener> listeners = getAutoConfigurationImportListeners();
 		if (!listeners.isEmpty()) {
+			// <2> 创建 AutoConfigurationImportEvent 事件
 			AutoConfigurationImportEvent event = new AutoConfigurationImportEvent(this,
 					configurations, exclusions);
+			// <3> 遍历 AutoConfigurationImportListener 监听器们，逐个通知
 			for (AutoConfigurationImportListener listener : listeners) {
+				// <3.1> 设置 AutoConfigurationImportListener 的属性
 				invokeAwareMethods(listener);
 				listener.onAutoConfigurationImportEvent(event);
 			}
@@ -381,8 +414,14 @@ public class AutoConfigurationImportSelector
 	private static class AutoConfigurationGroup implements DeferredImportSelector.Group,
 			BeanClassLoaderAware, BeanFactoryAware, ResourceLoaderAware {
 
+		/**
+		 * AnnotationMetadata 的映射
+		 *
+		 * KEY：配置类的全类名(即 xxxAutoConfiguration)
+		 */
 		private final Map<String, AnnotationMetadata> entries = new LinkedHashMap<>();
-
+		
+		/** AutoConfigurationEntry数组 */
 		private final List<AutoConfigurationEntry> autoConfigurationEntries = new ArrayList<>();
 
 		private ClassLoader beanClassLoader;
@@ -391,6 +430,7 @@ public class AutoConfigurationImportSelector
 
 		private ResourceLoader resourceLoader;
 
+		/** 自动配置的元数据 */
 		private AutoConfigurationMetadata autoConfigurationMetadata;
 
 		@Override
@@ -411,15 +451,19 @@ public class AutoConfigurationImportSelector
 		@Override
 		public void process(AnnotationMetadata annotationMetadata,
 				DeferredImportSelector deferredImportSelector) {
+			//断言  deferredImportSelector必须是AutoConfigurationImportSelector
 			Assert.state(
 					deferredImportSelector instanceof AutoConfigurationImportSelector,
 					() -> String.format("Only %s implementations are supported, got %s",
 							AutoConfigurationImportSelector.class.getSimpleName(),
 							deferredImportSelector.getClass().getName()));
+			// <1> 获得 AutoConfigurationEntry 对象 
 			AutoConfigurationEntry autoConfigurationEntry = ((AutoConfigurationImportSelector) deferredImportSelector)
 					.getAutoConfigurationEntry(getAutoConfigurationMetadata(),
 							annotationMetadata);
+			// <2> 添加到 autoConfigurationEntries 中
 			this.autoConfigurationEntries.add(autoConfigurationEntry);
+			// <3> 添加到 entries 中
 			for (String importClassName : autoConfigurationEntry.getConfigurations()) {
 				this.entries.putIfAbsent(importClassName, annotationMetadata);
 			}
@@ -430,24 +474,32 @@ public class AutoConfigurationImportSelector
 			if (this.autoConfigurationEntries.isEmpty()) {
 				return Collections.emptyList();
 			}
+			// <2.1> 获得 allExclusions
 			Set<String> allExclusions = this.autoConfigurationEntries.stream()
 					.map(AutoConfigurationEntry::getExclusions)
 					.flatMap(Collection::stream).collect(Collectors.toSet());
+			 // <2.2> 获得 processedConfigurations
 			Set<String> processedConfigurations = this.autoConfigurationEntries.stream()
 					.map(AutoConfigurationEntry::getConfigurations)
 					.flatMap(Collection::stream)
 					.collect(Collectors.toCollection(LinkedHashSet::new));
+			 // <2.3> 从 processedConfigurations 中，移除排除的
 			processedConfigurations.removeAll(allExclusions);
 
 			return sortAutoConfigurations(processedConfigurations,
-					getAutoConfigurationMetadata())
+					getAutoConfigurationMetadata())// <3.1> 排序
 							.stream()
 							.map((importClassName) -> new Entry(
-									this.entries.get(importClassName), importClassName))
-							.collect(Collectors.toList());
+									this.entries.get(importClassName), importClassName))// <3.2> 创建 Entry 对象
+							.collect(Collectors.toList());// <3.3> 转换成 List
 		}
 
+		/**
+		 * 自动配置元数据;用途在于制定配置类的生效条件(Condition)
+		 * @return {@link AutoConfigurationMetadataLoader.PropertiesAutoConfigurationMetadata# }
+		 */
 		private AutoConfigurationMetadata getAutoConfigurationMetadata() {
+			//不存在则加载
 			if (this.autoConfigurationMetadata == null) {
 				this.autoConfigurationMetadata = AutoConfigurationMetadataLoader
 						.loadMetadata(this.beanClassLoader);
@@ -474,10 +526,16 @@ public class AutoConfigurationImportSelector
 
 	}
 
+	/**
+	 * 自动配置条目详情  在 {@link AutoConfigurationGroup#process(AnnotationMetadata, DeferredImportSelector)}...)中赋值
+	 *
+	 */
 	protected static class AutoConfigurationEntry {
 
+		/** 配置类的全类名的数组 */
 		private final List<String> configurations;
-
+		
+		/** 排除的配置类的全类名的数组  */
 		private final Set<String> exclusions;
 
 		private AutoConfigurationEntry() {

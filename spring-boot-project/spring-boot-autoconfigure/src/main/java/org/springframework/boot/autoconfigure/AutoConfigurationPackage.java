@@ -28,6 +28,7 @@ import org.springframework.context.annotation.Import;
 /**
  * Indicates that the package containing the annotated class should be registered with
  * {@link AutoConfigurationPackages}.
+ * 自动配置包，它会获取主程序类所在的包路径，并将包路径（包括子包）下的所有组件注册到 Spring IOC 容器中。
  *
  * @author Phillip Webb
  * @since 1.3.0
