@@ -282,7 +282,7 @@ public class AutoConfigurationImportSelector
 		String[] candidates = StringUtils.toStringArray(configurations);
 		boolean[] skip = new boolean[candidates.length];// 每个配置类是否需要忽略的数组，通过下标与candidates互相索引
 		boolean skipped = false;//是否有忽略的配置
-		//得到所有的AutoConfigurationImportFilter
+		//得到所有的AutoConfigurationImportFilter(在META-INF/spring.factories 里的类名的数组)
 		for (AutoConfigurationImportFilter filter : getAutoConfigurationImportFilters()) {
 			//设置filter的属性
 			invokeAwareMethods(filter);

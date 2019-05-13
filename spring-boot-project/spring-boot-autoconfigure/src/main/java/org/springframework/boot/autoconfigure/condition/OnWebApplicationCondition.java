@@ -55,8 +55,9 @@ class OnWebApplicationCondition extends FilteringSpringBootCondition {
 		for (int i = 0; i < outcomes.length; i++) {
 			String autoConfigurationClass = autoConfigurationClasses[i];
 			if (autoConfigurationClass != null) {
+				//执行匹配
 				outcomes[i] = getOutcome(autoConfigurationMetadata
-						.get(autoConfigurationClass, "ConditionalOnWebApplication"));
+						.get(autoConfigurationClass, "ConditionalOnWebApplication"));//获得 @ConditionalOnWebApplication 属性值
 			}
 		}
 		return outcomes;
@@ -68,20 +69,21 @@ class OnWebApplicationCondition extends FilteringSpringBootCondition {
 		}
 		ConditionMessage.Builder message = ConditionMessage
 				.forCondition(ConditionalOnWebApplication.class);
-		if (ConditionalOnWebApplication.Type.SERVLET.name().equals(type)) {
+		if (ConditionalOnWebApplication.Type.SERVLET.name().equals(type)) {//要求是SERVLET结果不存在SERVLET_WEB_APPLICATION_CLASS类,返回不匹配
 			if (!ClassNameFilter.isPresent(SERVLET_WEB_APPLICATION_CLASS,
 					getBeanClassLoader())) {
 				return ConditionOutcome.noMatch(
 						message.didNotFind("servlet web application classes").atAll());
 			}
 		}
-		if (ConditionalOnWebApplication.Type.REACTIVE.name().equals(type)) {
+		if (ConditionalOnWebApplication.Type.REACTIVE.name().equals(type)) {//要求是REACTIVE 结果不存在REACTIVE_WEB_APPLICATION_CLASS类,返回不匹配
 			if (!ClassNameFilter.isPresent(REACTIVE_WEB_APPLICATION_CLASS,
 					getBeanClassLoader())) {
 				return ConditionOutcome.noMatch(
 						message.didNotFind("reactive web application classes").atAll());
 			}
 		}
+		//如果REACTIVE_WEB_APPLICATION_CLASS 跟 REACTIVE_WEB_APPLICATION_CLASS都不存在则返回不匹配
 		if (!ClassNameFilter.isPresent(SERVLET_WEB_APPLICATION_CLASS,
 				getBeanClassLoader())
 				&& !ClassUtils.isPresent(REACTIVE_WEB_APPLICATION_CLASS,
@@ -95,21 +97,26 @@ class OnWebApplicationCondition extends FilteringSpringBootCondition {
 	@Override
 	public ConditionOutcome getMatchOutcome(ConditionContext context,
 			AnnotatedTypeMetadata metadata) {
+		//判断是否有 @ConditionalOnWebapplication 注解
 		boolean required = metadata
 				.isAnnotated(ConditionalOnWebApplication.class.getName());
+		// 判断是否匹配web环境
 		ConditionOutcome outcome = isWebApplication(context, metadata, required);
+		//如果有@ConditionalOnWebapplication 注解但是不是web环境,返回不匹配
 		if (required && !outcome.isMatch()) {
 			return ConditionOutcome.noMatch(outcome.getConditionMessage());
 		}
+		//如果没有@ConditionalOnWebapplication 注解但是匹配web环境,返回不匹配
 		if (!required && outcome.isMatch()) {
 			return ConditionOutcome.noMatch(outcome.getConditionMessage());
 		}
+		//返回匹配
 		return ConditionOutcome.match(outcome.getConditionMessage());
 	}
 
 	private ConditionOutcome isWebApplication(ConditionContext context,
 			AnnotatedTypeMetadata metadata, boolean required) {
-		switch (deduceType(metadata)) {
+		switch (deduceType(metadata)) { //获得要求的web类型
 		case SERVLET:
 			return isServletWebApplication(context);
 		case REACTIVE:
@@ -133,13 +140,19 @@ class OnWebApplicationCondition extends FilteringSpringBootCondition {
 			return new ConditionOutcome(reactiveOutcome.isMatch(),
 					message.because(reactiveOutcome.getMessage()));
 		}
-		return new ConditionOutcome(servletOutcome.isMatch() || reactiveOutcome.isMatch(),
+		return new ConditionOutcome(servletOutcome.isMatch() || reactiveOutcome.isMatch(),  //servlet 跟 reactive有任一匹配
 				message.because(servletOutcome.getMessage()).append("and")
 						.append(reactiveOutcome.getMessage()));
 	}
 
+	/**
+	 * 判断是否servlet web环境
+	 * @param context
+	 * @return
+	 */
 	private ConditionOutcome isServletWebApplication(ConditionContext context) {
 		ConditionMessage.Builder message = ConditionMessage.forCondition("");
+		//不存在SERVLET_WEB_APPLICATION_CLASS类返回不匹配
 		if (!ClassNameFilter.isPresent(SERVLET_WEB_APPLICATION_CLASS,
 				context.getClassLoader())) {
 			return ConditionOutcome.noMatch(
@@ -147,39 +160,56 @@ class OnWebApplicationCondition extends FilteringSpringBootCondition {
 		}
 		if (context.getBeanFactory() != null) {
 			String[] scopes = context.getBeanFactory().getRegisteredScopeNames();
-			if (ObjectUtils.containsElement(scopes, "session")) {
+			if (ObjectUtils.containsElement(scopes, "session")) {//存在session scope返回匹配
 				return ConditionOutcome.match(message.foundExactly("'session' scope"));
 			}
 		}
+		//如果是ConfigurableWebEnvironment类型返回匹配
 		if (context.getEnvironment() instanceof ConfigurableWebEnvironment) {
 			return ConditionOutcome
 					.match(message.foundExactly("ConfigurableWebEnvironment"));
 		}
+		//如果resourceLoader是WebApplicationContext类型返回匹配
 		if (context.getResourceLoader() instanceof WebApplicationContext) {
 			return ConditionOutcome.match(message.foundExactly("WebApplicationContext"));
 		}
+		//返回不匹配
 		return ConditionOutcome.noMatch(message.because("not a servlet web application"));
 	}
 
+	/**
+	 * 判断是否reactive web环境
+	 * @param context
+	 * @return
+	 */
 	private ConditionOutcome isReactiveWebApplication(ConditionContext context) {
 		ConditionMessage.Builder message = ConditionMessage.forCondition("");
+		//不存在REACTIVE_WEB_APPLICATION_CLASS类返回不匹配
 		if (!ClassNameFilter.isPresent(REACTIVE_WEB_APPLICATION_CLASS,
 				context.getClassLoader())) {
 			return ConditionOutcome.noMatch(
 					message.didNotFind("reactive web application classes").atAll());
 		}
+		//environment为ConfigurableReactiveWebEnvironment类型返回匹配
 		if (context.getEnvironment() instanceof ConfigurableReactiveWebEnvironment) {
 			return ConditionOutcome
 					.match(message.foundExactly("ConfigurableReactiveWebEnvironment"));
 		}
+		//resourceLoader为ReactiveWebApplicationContext类型返回匹配
 		if (context.getResourceLoader() instanceof ReactiveWebApplicationContext) {
 			return ConditionOutcome
 					.match(message.foundExactly("ReactiveWebApplicationContext"));
 		}
+		//返回不匹配
 		return ConditionOutcome
 				.noMatch(message.because("not a reactive web application"));
 	}
 
+	/**
+	 * 获得注解里的type属性,否则返回ANY
+	 * @param metadata
+	 * @return
+	 */
 	private Type deduceType(AnnotatedTypeMetadata metadata) {
 		Map<String, Object> attributes = metadata
 				.getAnnotationAttributes(ConditionalOnWebApplication.class.getName());

@@ -32,6 +32,8 @@ import org.springframework.util.StringUtils;
  * Base of all {@link Condition} implementations used with Spring Boot. Provides sensible
  * logging to help the user diagnose what classes are loaded.
  *
+ * 主要用于提供相应的日志，帮助开发者判断哪些被进行加载。
+ *
  * @author Phillip Webb
  * @author Greg Turnquist
  */
@@ -42,11 +44,16 @@ public abstract class SpringBootCondition implements Condition {
 	@Override
 	public final boolean matches(ConditionContext context,
 			AnnotatedTypeMetadata metadata) {
+		// <1> 获得注解是方法名还是类名
 		String classOrMethodName = getClassOrMethodName(metadata);
 		try {
+			//<2> 条件匹配结果
 			ConditionOutcome outcome = getMatchOutcome(context, metadata);
+			//打印结果
 			logOutcome(classOrMethodName, outcome);
+			//记录
 			recordEvaluation(context, classOrMethodName, outcome);
+			//返回是否匹配
 			return outcome.isMatch();
 		}
 		catch (NoClassDefFoundError ex) {
@@ -78,10 +85,12 @@ public abstract class SpringBootCondition implements Condition {
 	}
 
 	private static String getClassOrMethodName(AnnotatedTypeMetadata metadata) {
+		//类
 		if (metadata instanceof ClassMetadata) {
 			ClassMetadata classMetadata = (ClassMetadata) metadata;
 			return classMetadata.getClassName();
 		}
+		//方法
 		MethodMetadata methodMetadata = (MethodMetadata) metadata;
 		return methodMetadata.getDeclaringClassName() + "#"
 				+ methodMetadata.getMethodName();
@@ -118,6 +127,7 @@ public abstract class SpringBootCondition implements Condition {
 
 	/**
 	 * Determine the outcome of the match along with suitable log output.
+	 * 提供给子类Condition的实现
 	 * @param context the condition context
 	 * @param metadata the annotation metadata
 	 * @return the condition outcome
@@ -127,6 +137,7 @@ public abstract class SpringBootCondition implements Condition {
 
 	/**
 	 * Return true if any of the specified conditions match.
+	 * 判断是否匹配指定的 Condition 们中的任一个
 	 * @param context the context
 	 * @param metadata the annotation meta-data
 	 * @param conditions conditions to test
@@ -134,8 +145,8 @@ public abstract class SpringBootCondition implements Condition {
 	 */
 	protected final boolean anyMatches(ConditionContext context,
 			AnnotatedTypeMetadata metadata, Condition... conditions) {
-		for (Condition condition : conditions) {
-			if (matches(context, metadata, condition)) {
+		for (Condition condition : conditions) {//遍历
+			if (matches(context, metadata, condition)) {//匹配
 				return true;
 			}
 		}
@@ -151,7 +162,7 @@ public abstract class SpringBootCondition implements Condition {
 	 */
 	protected final boolean matches(ConditionContext context,
 			AnnotatedTypeMetadata metadata, Condition condition) {
-		if (condition instanceof SpringBootCondition) {
+		if (condition instanceof SpringBootCondition) {//如果是SpringBootCondition
 			return ((SpringBootCondition) condition).getMatchOutcome(context, metadata)
 					.isMatch();
 		}
