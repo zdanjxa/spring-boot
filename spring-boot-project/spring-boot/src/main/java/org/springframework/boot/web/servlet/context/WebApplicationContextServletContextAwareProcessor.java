@@ -28,7 +28,7 @@ import org.springframework.web.context.support.ServletContextAwareProcessor;
  * {@link ConfigurableWebApplicationContext}. Can be used when registering the processor
  * can occur before the {@link ServletContext} or {@link ServletConfig} have been
  * initialized.
- *
+ * 处理实现 ServletContextAware 接口的 Bean
  * @author Phillip Webb
  */
 public class WebApplicationContextServletContextAwareProcessor
