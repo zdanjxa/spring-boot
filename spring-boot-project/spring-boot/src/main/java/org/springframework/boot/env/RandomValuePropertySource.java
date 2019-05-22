@@ -69,15 +69,21 @@ public class RandomValuePropertySource extends PropertySource<Random> {
 		this(RANDOM_PROPERTY_SOURCE_NAME);
 	}
 
+	/**
+	 * 获得 name 对应的随机值
+	 * @param name
+	 * @return
+	 */
 	@Override
 	public Object getProperty(String name) {
+		//必须以 random. 开头
 		if (!name.startsWith(PREFIX)) {
 			return null;
 		}
 		if (logger.isTraceEnabled()) {
 			logger.trace("Generating random property for '" + name + "'");
 		}
-		return getRandomValue(name.substring(PREFIX.length()));
+		return getRandomValue(name.substring(PREFIX.length()));//取值
 	}
 
 	private Object getRandomValue(String type) {
@@ -136,6 +142,10 @@ public class RandomValuePropertySource extends PropertySource<Random> {
 		return DigestUtils.md5DigestAsHex(bytes);
 	}
 
+	/**
+	 * 创建 RandomValuePropertySource 对象，添加到 environment 中
+	 * @param environment
+	 */
 	public static void addToEnvironment(ConfigurableEnvironment environment) {
 		environment.getPropertySources().addAfter(
 				StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
