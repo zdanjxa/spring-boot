@@ -44,6 +44,7 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Internal class by the {@link ConfigurationPropertiesBindingPostProcessor} to handle the
  * actual {@link ConfigurationProperties} binding.
+ * 处理 {@link ConfigurationProperties} 注解的 Bean 的属性的注入
  *
  * @author Stephane Nicoll
  * @author Phillip Webb
@@ -70,7 +71,7 @@ class ConfigurationPropertiesBinder {
 		this.configurationPropertiesValidator = getConfigurationPropertiesValidator(
 				applicationContext, validatorBeanName);
 		this.jsr303Present = ConfigurationPropertiesJsr303Validator
-				.isJsr303Present(applicationContext);
+				.isJsr303Present(applicationContext);//是否引入了Jsr303的相关依赖
 	}
 
 	public void bind(Bindable<?> target) {
@@ -78,11 +79,17 @@ class ConfigurationPropertiesBinder {
 				.getAnnotation(ConfigurationProperties.class);
 		Assert.state(annotation != null,
 				() -> "Missing @ConfigurationProperties on " + target);
-		List<Validator> validators = getValidators(target);
-		BindHandler bindHandler = getBindHandler(annotation, validators);
-		getBinder().bind(annotation.prefix(), target, bindHandler);
+		List<Validator> validators = getValidators(target);//获得Validator数组
+		BindHandler bindHandler = getBindHandler(annotation, validators);//获得BindHandler对象
+		getBinder().bind(annotation.prefix(), target, bindHandler);//获得 Binder 对象，然后执行绑定逻辑，处理 `@ConfigurationProperties` 注解的 Bean 的属性的注入
 	}
 
+	/**
+	 * 获得配置的Validator对象
+	 * @param applicationContext
+	 * @param validatorBeanName
+	 * @return
+	 */
 	private Validator getConfigurationPropertiesValidator(
 			ApplicationContext applicationContext, String validatorBeanName) {
 		if (applicationContext.containsBean(validatorBeanName)) {
@@ -93,12 +100,15 @@ class ConfigurationPropertiesBinder {
 
 	private List<Validator> getValidators(Bindable<?> target) {
 		List<Validator> validators = new ArrayList<>(3);
+		// 来源一，configurationPropertiesValidator
 		if (this.configurationPropertiesValidator != null) {
 			validators.add(this.configurationPropertiesValidator);
 		}
+		// 来源二，ConfigurationPropertiesJsr303Validator 对象
 		if (this.jsr303Present && target.getAnnotation(Validated.class) != null) {
 			validators.add(getJsr303Validator());
 		}
+		// 来源三，自己实现了 Validator 接口
 		if (target.getValue() != null && target.getValue().get() instanceof Validator) {
 			validators.add((Validator) target.getValue().get());
 		}
@@ -116,17 +126,21 @@ class ConfigurationPropertiesBinder {
 	private BindHandler getBindHandler(ConfigurationProperties annotation,
 			List<Validator> validators) {
 		BindHandler handler = new IgnoreTopLevelConverterNotFoundBindHandler();
+		// 如果有 ignoreInvalidFields 属性，进一步包装成 IgnoreErrorsBindHandler 类
 		if (annotation.ignoreInvalidFields()) {
 			handler = new IgnoreErrorsBindHandler(handler);
 		}
+		// 如果否 ignoreUnknownFields 属性，进一步包装成 NoUnboundElementsBindHandler 类
 		if (!annotation.ignoreUnknownFields()) {
 			UnboundElementsSourceFilter filter = new UnboundElementsSourceFilter();
 			handler = new NoUnboundElementsBindHandler(handler, filter);
 		}
+		// 如果 Validator 数组非空，进一步包装成 ValidationBindHandler 对象
 		if (!validators.isEmpty()) {
 			handler = new ValidationBindHandler(handler,
 					validators.toArray(new Validator[0]));
 		}
+		//如果有 ConfigurationPropertiesBindHandlerAdvisor 元素，则进一步处理 handler 对象
 		for (ConfigurationPropertiesBindHandlerAdvisor advisor : getBindHandlerAdvisors()) {
 			handler = advisor.apply(handler);
 		}
@@ -156,6 +170,10 @@ class ConfigurationPropertiesBinder {
 		return new PropertySourcesPlaceholdersResolver(this.propertySources);
 	}
 
+	/**
+	 * ConversionService类型转换器
+	 * @return
+	 */
 	private ConversionService getConversionService() {
 		return new ConversionServiceDeducer(this.applicationContext)
 				.getConversionService();

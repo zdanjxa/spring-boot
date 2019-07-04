@@ -36,12 +36,16 @@ public class ConfigurationPropertiesBindingPostProcessorRegistrar
 	public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata,
 			BeanDefinitionRegistry registry) {
 		if (!registry.containsBeanDefinition(
-				ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)) {
+				ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)) {//如果ConfigurationPropertiesBindingPostProcessor未注册
 			registerConfigurationPropertiesBindingPostProcessor(registry);
 			registerConfigurationBeanFactoryMetadata(registry);
 		}
 	}
 
+	/**
+	 * 注册ConfigurationPropertiesBindingPostProcessor
+	 * @param registry
+	 */
 	private void registerConfigurationPropertiesBindingPostProcessor(
 			BeanDefinitionRegistry registry) {
 		GenericBeanDefinition definition = new GenericBeanDefinition();
@@ -52,6 +56,10 @@ public class ConfigurationPropertiesBindingPostProcessorRegistrar
 
 	}
 
+	/**
+	 * 注册ConfigurationBeanFactoryMetadata
+	 * @param registry
+	 */
 	private void registerConfigurationBeanFactoryMetadata(
 			BeanDefinitionRegistry registry) {
 		GenericBeanDefinition definition = new GenericBeanDefinition();

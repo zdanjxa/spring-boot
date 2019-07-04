@@ -35,6 +35,7 @@ import org.springframework.validation.annotation.Validated;
 /**
  * {@link BeanPostProcessor} to bind {@link PropertySources} to beans annotated with
  * {@link ConfigurationProperties}.
+ * 将配置文件注入到{@link ConfigurationProperties}注解的Bean中
  *
  * @author Dave Syer
  * @author Phillip Webb
@@ -95,16 +96,22 @@ public class ConfigurationPropertiesBindingPostProcessor implements BeanPostProc
 		return bean;
 	}
 
+	/**
+	 * 配置注入
+	 * @param bean
+	 * @param beanName
+	 * @param annotation
+	 */
 	private void bind(Object bean, String beanName, ConfigurationProperties annotation) {
-		ResolvableType type = getBeanType(bean, beanName);
+		ResolvableType type = getBeanType(bean, beanName);//解析bean的类型
 		Validated validated = getAnnotation(bean, beanName, Validated.class);
-		Annotation[] annotations = (validated != null)
+		Annotation[] annotations = (validated != null)  //是否存在@Validated注解
 				? new Annotation[] { annotation, validated }
 				: new Annotation[] { annotation };
 		Bindable<?> target = Bindable.of(type).withExistingValue(bean)
-				.withAnnotations(annotations);
+				.withAnnotations(annotations);//创建Bindable对象
 		try {
-			this.configurationPropertiesBinder.bind(target);
+			this.configurationPropertiesBinder.bind(target);//将配置文件注入到 @ConfigurationProperties 注解的 Bean 的属性中
 		}
 		catch (Exception ex) {
 			throw new ConfigurationPropertiesBindException(beanName, bean, annotation,
@@ -113,11 +120,11 @@ public class ConfigurationPropertiesBindingPostProcessor implements BeanPostProc
 	}
 
 	private ResolvableType getBeanType(Object bean, String beanName) {
-		Method factoryMethod = this.beanFactoryMetadata.findFactoryMethod(beanName);
-		if (factoryMethod != null) {
+		Method factoryMethod = this.beanFactoryMetadata.findFactoryMethod(beanName);//获得BeanName对应的工厂方法
+		if (factoryMethod != null) {//如果不为空,则说明是Configuration类创建的Bean对象
 			return ResolvableType.forMethodReturnType(factoryMethod);
 		}
-		return ResolvableType.forClass(bean.getClass());
+		return ResolvableType.forClass(bean.getClass());//否则就是普通类创建的Bean对象
 	}
 
 	private <A extends Annotation> A getAnnotation(Object bean, String beanName,

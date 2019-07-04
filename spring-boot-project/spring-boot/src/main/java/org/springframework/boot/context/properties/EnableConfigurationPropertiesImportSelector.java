@@ -34,6 +34,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 
 /**
+ * 实现ImportSelector接口,处理{@link EnableConfigurationProperties}注解<br/>
  * Import selector that sets up binding of external properties to configuration classes
  * (see {@link ConfigurationProperties}). It either registers a
  * {@link ConfigurationProperties} bean or not, depending on whether the enclosing
@@ -60,6 +61,7 @@ class EnableConfigurationPropertiesImportSelector implements ImportSelector {
 
 	/**
 	 * {@link ImportBeanDefinitionRegistrar} for configuration properties support.
+	 * 将 {@link ImportBeanDefinitionRegistrar} 注解指定的类，逐个注册成对应的 BeanDefinition 对象
 	 */
 	public static class ConfigurationPropertiesBeanRegistrar
 			implements ImportBeanDefinitionRegistrar {
@@ -71,6 +73,11 @@ class EnableConfigurationPropertiesImportSelector implements ImportSelector {
 					(ConfigurableListableBeanFactory) registry, type));
 		}
 
+		/**
+		 * 获得@EnableConfigurationProperties的value属性(即需要配置的配置类)
+		 * @param metadata
+		 * @return
+		 */
 		private List<Class<?>> getTypes(AnnotationMetadata metadata) {
 			MultiValueMap<String, Object> attributes = metadata
 					.getAllAnnotationAttributes(
@@ -87,16 +94,21 @@ class EnableConfigurationPropertiesImportSelector implements ImportSelector {
 
 		private void register(BeanDefinitionRegistry registry,
 				ConfigurableListableBeanFactory beanFactory, Class<?> type) {
-			String name = getName(type);
-			if (!containsBeanDefinition(beanFactory, name)) {
+			String name = getName(type);//通过 @ConfigurationProperties 注解，获得最后要生成的 BeanDefinition 的名字。格式为 prefix-类全名 or 类全名
+			if (!containsBeanDefinition(beanFactory, name)) {//如果此bean name没有注册
 				registerBeanDefinition(registry, name, type);
 			}
 		}
 
+		/**
+		 * 获取bean name
+		 * @param type
+		 * @return
+		 */
 		private String getName(Class<?> type) {
 			ConfigurationProperties annotation = AnnotationUtils.findAnnotation(type,
 					ConfigurationProperties.class);
-			String prefix = (annotation != null) ? annotation.prefix() : "";
+			String prefix = (annotation != null) ? annotation.prefix() : "";//如果存在ConfigurationProperties并且prefix属性不为空,则拼接
 			return (StringUtils.hasText(prefix) ? prefix + "-" + type.getName()
 					: type.getName());
 		}
@@ -107,7 +119,7 @@ class EnableConfigurationPropertiesImportSelector implements ImportSelector {
 				return true;
 			}
 			BeanFactory parent = beanFactory.getParentBeanFactory();
-			if (parent instanceof ConfigurableListableBeanFactory) {
+			if (parent instanceof ConfigurableListableBeanFactory) {//父容器
 				return containsBeanDefinition((ConfigurableListableBeanFactory) parent,
 						name);
 			}
@@ -117,11 +129,16 @@ class EnableConfigurationPropertiesImportSelector implements ImportSelector {
 		private void registerBeanDefinition(BeanDefinitionRegistry registry, String name,
 				Class<?> type) {
 			assertHasAnnotation(type);
+			//注册
 			GenericBeanDefinition definition = new GenericBeanDefinition();
 			definition.setBeanClass(type);
 			registry.registerBeanDefinition(name, definition);
 		}
 
+		/**
+		 * type一定要有@ConfigurationProperties注解
+		 * @param type
+		 */
 		private void assertHasAnnotation(Class<?> type) {
 			Assert.notNull(
 					AnnotationUtils.findAnnotation(type, ConfigurationProperties.class),

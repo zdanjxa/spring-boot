@@ -31,6 +31,7 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 
 /**
+ * 初始化配置类创建 Bean 的每个方法的元数据<br/>
  * Utility class to memorize {@code @Bean} definition meta data during initialization of
  * the bean factory.
  *
@@ -55,14 +56,20 @@ public class ConfigurationBeanFactoryMetadata implements BeanFactoryPostProcesso
 		this.beanFactory = beanFactory;
 		for (String name : beanFactory.getBeanDefinitionNames()) {
 			BeanDefinition definition = beanFactory.getBeanDefinition(name);
-			String method = definition.getFactoryMethodName();
-			String bean = definition.getFactoryBeanName();
-			if (method != null && bean != null) {
+			String method = definition.getFactoryMethodName();//@Bean所在的方法名
+			String bean = definition.getFactoryBeanName();//当前是在哪个bean上(可以理解为 name是定义在bean里的,@Bean )
+			if (method != null && bean != null) {//添加到 beansFactoryMetadata 中
 				this.beansFactoryMetadata.put(name, new FactoryMetadata(bean, method));
 			}
 		}
 	}
 
+	/**
+	 * 获得 beansFactoryMetadata 中的每个 Bean 的方法上的指定注解
+	 * @param type
+	 * @param <A>
+	 * @return
+	 */
 	public <A extends Annotation> Map<String, Object> getBeansWithFactoryAnnotation(
 			Class<A> type) {
 		Map<String, Object> result = new HashMap<>();
@@ -74,23 +81,37 @@ public class ConfigurationBeanFactoryMetadata implements BeanFactoryPostProcesso
 		return result;
 	}
 
+	/**
+	 * 获得指定 Bean 的创建方法上的注解
+	 * @param beanName
+	 * @param type
+	 * @param <A>
+	 * @return
+	 */
 	public <A extends Annotation> A findFactoryAnnotation(String beanName,
 			Class<A> type) {
 		Method method = findFactoryMethod(beanName);
 		return (method != null) ? AnnotationUtils.findAnnotation(method, type) : null;
 	}
 
+	/**
+	 * 查找beansFactoryMetadata里对应的bean里的method
+	 * @param beanName
+	 * @return
+	 */
 	public Method findFactoryMethod(String beanName) {
 		if (!this.beansFactoryMetadata.containsKey(beanName)) {
 			return null;
 		}
 		AtomicReference<Method> found = new AtomicReference<>(null);
-		FactoryMetadata metadata = this.beansFactoryMetadata.get(beanName);
+		FactoryMetadata metadata = this.beansFactoryMetadata.get(beanName);// 获得 beanName 对应的 FactoryMetadata 对象
+		//获得工厂类
 		Class<?> factoryType = this.beanFactory.getType(metadata.getBean());
 		String factoryMethod = metadata.getMethod();
 		if (ClassUtils.isCglibProxyClass(factoryType)) {
 			factoryType = factoryType.getSuperclass();
 		}
+		// 获得对应的工厂类的方法
 		ReflectionUtils.doWithMethods(factoryType, (method) -> {
 			if (method.getName().equals(factoryMethod)) {
 				found.compareAndSet(null, method);
